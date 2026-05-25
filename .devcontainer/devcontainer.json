@@ -1,5 +1,5 @@
 {
-  "name": "Claude Code DevContainer",
+  "name": "AI Coding Agents DevContainer",
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -8,7 +8,9 @@
   },
   "remoteUser": "vscode",
   "mounts": [
-    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
+    "source=codex-config-${devcontainerId},target=/home/vscode/.codex,type=volume",
+    "source=gemini-config-${devcontainerId},target=/home/vscode/.gemini,type=volume"
   ],
   "customizations": {
     "vscode": {
@@ -22,5 +24,6 @@
         "editor.formatOnSave": true
       }
     }
-  }
+  },
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude /home/vscode/.codex /home/vscode/.gemini || true && node --version && npm --version && claude --version || true && codex --version || true && gemini --version || true"
 }
