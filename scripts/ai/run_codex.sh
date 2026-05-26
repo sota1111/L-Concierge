@@ -13,7 +13,4 @@ fi
 
 echo "== Codex CLI: debugging worker =="
 
-codex exec "$(cat "$PROMPT_FILE")" | tee "$REPORT_FILE"
-
-# If Codex sandbox fails inside Dev Container, use:
-# codex --sandbox danger-full-access exec "$(cat "$PROMPT_FILE")" | tee "$REPORT_FILE"
+codex --sandbox danger-full-access exec "$(cat "$PROMPT_FILE")" | tee "$REPORT_FILE"
