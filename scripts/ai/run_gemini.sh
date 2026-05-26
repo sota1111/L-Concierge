@@ -13,4 +13,4 @@ fi
 
 echo "== Gemini CLI: implementation worker =="
 
-gemini -p "$(cat "$PROMPT_FILE")" | tee "$REPORT_FILE"
+gemini --yolo -p "$(cat "$PROMPT_FILE")" | tee "$REPORT_FILE"
