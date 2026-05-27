@@ -1,7 +1,7 @@
 # 00 Project Context
 
 ## Project Name
-L-Concierge
+ai-dev-control-plane
 
 ## Purpose
 [Describe the project purpose here]

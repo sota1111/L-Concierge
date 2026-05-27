@@ -1,4 +1,4 @@
-# L-Concierge
+# ai-dev-control-plane
 
 Dev Containers: Rebuild Container
 
