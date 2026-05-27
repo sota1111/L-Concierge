@@ -570,10 +570,9 @@ PR 作成後:
 Merge してよい条件:
 
 1. **PR が作成済み** で Quality Gate をすべて通過している
-2. **開発者の承認** — 開発者が Linear で完了承認した場合、または PR に Approve が付いた場合
-3. **コンフリクトなし** — main との merge conflict がないこと
+2. **コンフリクトなし** — main との merge conflict がないこと
 
-開発者の明示的な承認がない場合、Merge は行わず `In Review` で待機する。
+Quality Gate をすべて通過していれば、Claude Code が自律的に PR を Approve してMerge する。開発者の承認を待たずに進める。
 
 ### Merge Procedure
 
@@ -666,8 +665,7 @@ Event: <PR Created / PR Merged / Branch Created>
 | #   | 条件                      | 検証方法                       | 必須 |
 | --- | ------------------------- | ------------------------------ | ---- |
 | M1  | PR Quality Gate 通過済み  | 上記 Q1-Q7 すべて pass         | Yes  |
-| M2  | 開発者承認あり            | Linear コメント or PR Approve  | Yes  |
-| M3  | main とのコンフリクトなし | `git merge --no-commit` テスト | Yes  |
+| M2  | main とのコンフリクトなし | `git merge --no-commit` テスト | Yes  |
 
 ### 失敗時の対応
 
