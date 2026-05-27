@@ -41,12 +41,9 @@ From the human's perspective, Claude Code handles everything.
 
 ## When to Use Gemini CLI
 
-Invoke `scripts/ai/run_gemini.sh` when:
+**MANDATORY**: Claude Code must ALWAYS invoke `scripts/ai/run_gemini.sh` for ALL `[IMPLEMENT]` child Issues, without exception.
 
-- New feature implementation is needed
-- Multiple files need to be changed
-- UI, API, or business logic must be created or modified
-- The human has approved the design in `docs/ai/20_design.md`
+Claude Code must NEVER write implementation code directly. All file creation, editing, and feature implementation must go through Gemini CLI.
 
 Before running, write the full instruction into `prompts/gemini/implement.md`.
 
@@ -54,12 +51,9 @@ Before running, write the full instruction into `prompts/gemini/implement.md`.
 
 ## When to Use Codex CLI
 
-Invoke `scripts/ai/run_codex.sh` when:
+**MANDATORY**: Claude Code must ALWAYS invoke `scripts/ai/run_codex.sh` for ALL `[DEBUG]` child Issues, without exception.
 
-- Lint / typecheck / test failures are reported
-- A Playwright browser verification is required
-- A debugging pass is needed after Gemini implementation
-- The acceptance criteria in `docs/ai/40_acceptance.md` must be verified
+Claude Code must NEVER run lint / typecheck / tests or apply fixes directly. All verification and debugging must go through Codex CLI.
 
 Before running, write the full instruction into `prompts/codex/debug.md`.
 
@@ -324,23 +318,12 @@ It should comment on Linear with the conflict and proposed action.
 
 ### Worker Tool Use
 
-Claude Code may internally use Gemini CLI and Codex CLI.
+**MANDATORY**: Claude Code must always delegate to the appropriate worker CLI. Direct implementation or verification by Claude Code is prohibited.
 
-Use Gemini CLI when:
+- **ALL `[IMPLEMENT]` tasks** → MUST use Gemini CLI (`scripts/ai/run_gemini.sh`)
+- **ALL `[DEBUG]` tasks** → MUST use Codex CLI (`scripts/ai/run_codex.sh`)
 
-- The Linear issue requires feature implementation
-- Multiple files need to be changed
-- UI / API / business logic needs to be created
-- A design already exists
-
-Use Codex CLI when:
-
-- A bug must be investigated
-- Tests fail
-- lint / typecheck fails
-- Browser behavior must be checked
-- Playwright verification is needed
-- Minimal corrective changes are required
+Claude Code must NEVER implement code or run tests directly, regardless of task complexity.
 
 Do not expose Gemini CLI or Codex CLI as user-facing agents in Linear comments.
 From the user's perspective, Claude Code is handling the task.
@@ -519,6 +502,8 @@ test(LC-100): E2Eテスト追加
 ```
 
 ### PR Creation Conditions (Quality Gate)
+
+**MANDATORY**: Claude Code must ALWAYS create a Pull Request after all child Issues are Done. Pushing directly to `main` and skipping PR creation is strictly prohibited.
 
 PR を作成してよい条件（すべて満たすこと）:
 
