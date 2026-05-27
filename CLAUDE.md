@@ -11,21 +11,26 @@ From the human's perspective, Claude Code handles everything.
 ## Role Assignments
 
 ### Claude Code (Orchestrator)
+
 - Single point of contact with the human
 - Requirements gathering and clarification
 - Planning and design
-- Task decomposition
+- Task decomposition and **child Issue registration to Linear**
 - Writing instruction prompts for worker CLIs
 - Reviewing worker output
-- Final decision-making
-- Reporting back to the human
+- Final decision-making (quality gate)
+- **GitHub operations: branch, PR creation, PR update, Merge**
+- **Linear state sync after GitHub events**
+- Reporting back to the human (Linear comments only in autonomous mode)
 
 ### Gemini CLI (Implementation Worker)
+
 - Implementing features across multiple files
 - Creating UI, API, and business logic
 - Writing implementation result reports to `docs/ai/50_worker_gemini_report.md`
 
 ### Codex CLI (Debug & Verification Worker)
+
 - Running lint / typecheck / test
 - Browser verification via Playwright
 - Identifying root causes of failures
@@ -37,6 +42,7 @@ From the human's perspective, Claude Code handles everything.
 ## When to Use Gemini CLI
 
 Invoke `scripts/ai/run_gemini.sh` when:
+
 - New feature implementation is needed
 - Multiple files need to be changed
 - UI, API, or business logic must be created or modified
@@ -49,6 +55,7 @@ Before running, write the full instruction into `prompts/gemini/implement.md`.
 ## When to Use Codex CLI
 
 Invoke `scripts/ai/run_codex.sh` when:
+
 - Lint / typecheck / test failures are reported
 - A Playwright browser verification is required
 - A debugging pass is needed after Gemini implementation
@@ -132,6 +139,7 @@ Human request
 ## Final Review Policy
 
 Before reporting results to the human, Claude Code must:
+
 1. Read `docs/ai/50_worker_gemini_report.md` and verify implementation completeness
 2. Read `docs/ai/60_worker_codex_report.md` and verify all checks pass
 3. Summarize findings in `docs/ai/70_final_report.md`
@@ -372,3 +380,316 @@ Claude Code must not:
 - Claim completion if verification was not performed
 
 If verification cannot be performed, Claude Code must state that clearly in the Linear comment.
+
+---
+
+## Child Issue Registration Policy
+
+### Purpose
+
+Claude Code decomposes parent Issues into actionable child Issues and registers them in Linear.
+The developer creates only the parent Issue (e.g., "LC-100 宅配ボックス画面作成").
+Claude Code handles all task decomposition and child Issue creation.
+
+### Trigger
+
+When Claude Code encounters a parent Issue (no sub-issues, contains a high-level requirement), it must:
+
+1. Read and understand the parent Issue description and comments
+2. Identify acceptance criteria from the parent Issue
+3. Decompose into implementable child Issues (typically 2–7 per parent)
+4. Register each child Issue in Linear as a sub-issue of the parent
+
+### Child Issue Naming Convention
+
+```text
+[IMPLEMENT] <親Issue ID> - <具体的タスク名>
+[DEBUG]     <親Issue ID> - <検証内容>
+[PLAN]      <親Issue ID> - <設計内容>
+```
+
+Example:
+
+```text
+Parent: LC-100 宅配ボックス画面作成
+  → [PLAN] LC-100 - API設計
+  → [IMPLEMENT] LC-100 - 一覧画面コンポーネント実装
+  → [IMPLEMENT] LC-100 - APIエンドポイント実装
+  → [DEBUG] LC-100 - E2Eテスト作成・実行
+```
+
+### Child Issue Description Template
+
+Each child Issue must contain:
+
+```markdown
+## Parent Issue
+
+<親Issue ID と Title>
+
+## Goal
+
+このタスクで達成すること
+
+## Scope
+
+- 対象ファイル / コンポーネント
+- 変更内容
+
+## Acceptance Criteria
+
+- [ ] 具体的な完了条件
+
+## Dependencies
+
+- 先行タスク（あれば）
+```
+
+### Registration Procedure
+
+Claude Code uses the MCP tool to register child Issues:
+
+1. `mcp__linear-server__create_issue` で子Issue作成
+2. 親Issueへの紐付け（parentId指定）
+3. 子Issueの Status を `Todo` に設定
+4. 子Issueの Priority を親から継承
+5. 親Issue にコメントで分解結果を報告
+
+### Execution Order
+
+子Issue の実行順序:
+
+1. `[PLAN]` タスク（設計が必要な場合）
+2. `[IMPLEMENT]` タスク（依存関係順）
+3. `[DEBUG]` タスク（実装完了後）
+
+各子Issue完了時に Status を `Done` に更新し、次の子Issueへ進む。
+全子Issue完了後、親Issue を `In Review` に変更。
+
+### Local Tracking
+
+子Issue 登録後、ローカルにも作業ファイルを作成する:
+
+```text
+docs/ai/linear/<PARENT_ISSUE_ID>.md
+```
+
+このファイルに、親Issue情報と全子Issueの一覧・進捗を記録する。
+
+---
+
+## GitHub Operations Policy
+
+### Purpose
+
+Claude Code controls all GitHub operations: branch creation, commit, PR creation, PR update, and Merge.
+GitHub is used as the artifact store and history management system.
+
+### Branch Strategy
+
+```text
+main (protected)
+  └── feat/<issue-id>-<short-description>
+        例: feat/LC-100-delivery-box-list
+```
+
+- 1つの親Issue に対して1つの feature branch を作成
+- 子Issue の作業はすべて同じ feature branch で行う
+- branch 名は小文字英数字とハイフンのみ
+
+### Branch Creation
+
+親Issue の最初の子Issue 着手時に branch を作成する:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feat/<issue-id>-<short-description>
+```
+
+### Commit Policy
+
+- 子Issue 完了ごとに commit する
+- commit message format: `<type>(<issue-id>): <summary>`
+
+```text
+feat(LC-100): 宅配ボックス一覧画面コンポーネント実装
+fix(LC-100): lint エラー修正
+test(LC-100): E2Eテスト追加
+```
+
+### PR Creation Conditions (Quality Gate)
+
+PR を作成してよい条件（すべて満たすこと）:
+
+1. **全子Issue が Done** — 親Issue配下の全タスクが完了している
+2. **Lint pass** — `npm run lint` が exit 0
+3. **TypeCheck pass** — `npm run typecheck` が exit 0
+4. **Unit test pass** — `npm test` が exit 0
+5. **E2E test pass** — `npm run e2e` が exit 0（該当する場合）
+6. **差分レビュー完了** — Claude Code が `git diff main...HEAD` を確認し、意図しない変更がないこと
+7. **受入条件確認** — 親Issue の Acceptance Criteria がすべて満たされていること
+
+1つでも満たさない場合、PR は作成せず、失敗した子Issue を再オープンして修正サイクルを回す。
+
+### PR Creation Procedure
+
+```bash
+git push origin feat/<issue-id>-<short-description>
+```
+
+MCP tool または GitHub CLI で PR を作成:
+
+- Title: `feat(<issue-id>): <親Issue Title>`
+- Body: 変更サマリ、子Issue一覧、テスト結果、受入条件チェックリスト
+- Base: `main`
+- Labels: 必要に応じて
+
+PR 作成後:
+
+- 親Issue に PR リンクをコメント
+- 親Issue Status を `In Review` に変更
+
+### PR Body Template
+
+```markdown
+## Summary
+
+<親Issue の Goal を1-2文で>
+
+## Changes
+
+- <変更内容を箇条書き>
+
+## Related Issues
+
+- Parent: <親Issue ID>
+- Children: <子Issue ID 一覧>
+
+## Quality Gate Results
+
+- [x] Lint: pass
+- [x] TypeCheck: pass
+- [x] Unit Test: pass
+- [x] E2E Test: pass / N/A
+- [x] Diff Review: no unintended changes
+
+## Acceptance Criteria
+
+- [x] <親Issue の受入条件1>
+- [x] <親Issue の受入条件2>
+```
+
+### Merge Conditions
+
+Merge してよい条件:
+
+1. **PR が作成済み** で Quality Gate をすべて通過している
+2. **開発者の承認** — 開発者が Linear で完了承認した場合、または PR に Approve が付いた場合
+3. **コンフリクトなし** — main との merge conflict がないこと
+
+開発者の明示的な承認がない場合、Merge は行わず `In Review` で待機する。
+
+### Merge Procedure
+
+```bash
+git checkout main
+git pull origin main
+git merge --no-ff feat/<issue-id>-<short-description>
+git push origin main
+git branch -d feat/<issue-id>-<short-description>
+git push origin --delete feat/<issue-id>-<short-description>
+```
+
+Merge 後:
+
+- 親Issue Status を `Done` に変更
+- 親Issue に Completion Report をコメント
+- feature branch を削除
+
+### Merge 失敗時
+
+conflict がある場合:
+
+1. `git merge --abort`
+2. feature branch で `git rebase main` を試行
+3. 自動解決できない場合は親Issue を `Blocked` にし、コンフリクト内容をコメント
+
+---
+
+## GitHub → Linear State Sync
+
+### Purpose
+
+GitHub でのイベント完了後、Claude Code が Linear に状態を同期する。
+開発者は Linear だけを見て状態を確認できる。別の報告経路は作らない。
+
+### Sync Events
+
+| GitHub Event          | Linear Action                                       |
+| --------------------- | --------------------------------------------------- |
+| Branch 作成           | 親Issue に「作業ブランチ作成」コメント              |
+| PR 作成               | 親Issue Status → `In Review`、PR リンクコメント     |
+| PR 更新（push）       | 親Issue に差分サマリコメント                        |
+| PR Merge              | 親Issue Status → `Done`、Completion Report コメント |
+| PR Close (not merged) | 親Issue Status → `Blocked`、理由コメント            |
+
+### Sync Comment Format
+
+```markdown
+## GitHub Sync
+
+Event: <PR Created / PR Merged / Branch Created>
+
+### Details
+
+- Branch: `feat/LC-100-delivery-box-list`
+- PR: #<number> (URL)
+- Status: <Open / Merged / Closed>
+
+### Next Action
+
+- <開発者への確認依頼 or 完了報告>
+```
+
+### Autonomous Mode Reporting Rule
+
+自律実行モード（`run_auto.sh` 経由）では:
+
+- **Linear コメントのみ**が報告先である
+- チャット、メール、Slack 等への別報告は行わない
+- 開発者は Linear を確認することで全進捗を把握できる
+
+---
+
+## Quality Gate Criteria
+
+### PR作成ゲート
+
+| #   | 条件                     | 検証方法                     | 必須         |
+| --- | ------------------------ | ---------------------------- | ------------ |
+| Q1  | Lint エラー 0            | `npm run lint` exit 0        | Yes          |
+| Q2  | 型エラー 0               | `npm run typecheck` exit 0   | Yes          |
+| Q3  | Unit test 全 pass        | `npm test` exit 0            | Yes          |
+| Q4  | E2E test 全 pass         | `npm run e2e` exit 0         | Yes (該当時) |
+| Q5  | 差分に意図しない変更なし | `git diff` レビュー          | Yes          |
+| Q6  | 受入条件すべて満たす     | Acceptance Criteria チェック | Yes          |
+| Q7  | 全子Issue Done           | Linear 子Issue Status 確認   | Yes          |
+
+### Merge ゲート
+
+| #   | 条件                      | 検証方法                       | 必須 |
+| --- | ------------------------- | ------------------------------ | ---- |
+| M1  | PR Quality Gate 通過済み  | 上記 Q1-Q7 すべて pass         | Yes  |
+| M2  | 開発者承認あり            | Linear コメント or PR Approve  | Yes  |
+| M3  | main とのコンフリクトなし | `git merge --no-commit` テスト | Yes  |
+
+### 失敗時の対応
+
+Quality Gate 失敗時:
+
+1. 失敗した項目を特定
+2. 対応する子Issue を再オープン（または新規作成）
+3. Gemini で修正実装 → Codex で再検証
+4. 全条件 pass まで繰り返す
+5. 3回連続失敗した場合、親Issue を `Blocked` にし、原因を Linear コメント

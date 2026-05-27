@@ -1,6 +1,6 @@
 Please process Linear issues using the following procedure.
 
-Use the MCP tool `mcp__linear-server__list_issues` to retrieve Todo issues.
+Use the MCP tool `mcp__linear-server__list_issues` to retrieve issues.
 
 Target the following statuses:
 
@@ -17,18 +17,112 @@ Within the same priority, process them in the following status order:
 
 In Progress → Todo → Backlog
 
-Termination conditions:
+---
 
-- The Linear issue content has been understood
-- The required implementation or investigation has been completed
-- The required verification has been completed
-- The changes have been reflected in GitHub
-- The Linear status has been updated or a comment has been added
-- It can be determined that continuing further will not produce any new results
-- If the task failed, the cause, unfinished items, and next required work have been recorded in logs or Linear
+## Parent Issue Detection and Child Issue Decomposition
 
-Once any of the above completion or failure conditions can be determined, terminate the process.
+When you find an issue that has NO sub-issues and contains a high-level requirement (parent Issue), decompose it:
 
-Waiting for interaction, waiting for additional instructions, infinite loops, and waiting for confirmation to continue are prohibited.
+1. Read the parent Issue description and all comments
+2. Identify acceptance criteria
+3. Decompose into 2–7 actionable child Issues
+4. Use `mcp__linear-server__create_issue` to register each child Issue with:
+   - parentId: the parent Issue ID
+   - Title format: `[IMPLEMENT] <parent-id> - <task name>` or `[DEBUG] <parent-id> - <verification>`
+   - Description: Goal, Scope, Acceptance Criteria, Dependencies
+   - Status: Todo
+   - Priority: inherit from parent
+5. Post a summary comment on the parent Issue listing all created child Issues
+6. Create local tracking file: `docs/ai/linear/<PARENT_ISSUE_ID>.md`
+
+---
+
+## Child Issue Execution Loop
+
+For each child Issue (in order: [PLAN] → [IMPLEMENT] → [DEBUG]):
+
+1. Update child Issue status to `In Progress`
+2. Post a progress comment on the child Issue
+
+### For [PLAN] child Issues:
+
+- Write design to `docs/ai/20_design.md`
+- Mark child Issue as `Done`
+
+### For [IMPLEMENT] child Issues:
+
+- Write Gemini instruction to `prompts/gemini/implement.md`
+- Run `scripts/ai/run_gemini.sh`
+- Read `docs/ai/50_worker_gemini_report.md`
+- Commit changes: `git add -A && git commit -m "feat(<parent-id>): <summary>"`
+- Mark child Issue as `Done`
+
+### For [DEBUG] child Issues:
+
+- Write Codex instruction to `prompts/codex/debug.md`
+- Run `scripts/ai/run_codex.sh`
+- Read `docs/ai/60_worker_codex_report.md`
+- If fixes were applied, commit: `git add -A && git commit -m "fix(<parent-id>): <summary>"`
+- Mark child Issue as `Done`
+
+---
+
+## Branch Management
+
+Before starting the first child Issue of a parent:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feat/<issue-id>-<short-description>
+```
+
+All child Issue work happens on this branch.
+
+---
+
+## Quality Gate and PR Creation
+
+After ALL child Issues are Done:
+
+1. Run quality checks:
+   - `npm run lint` → must exit 0
+   - `npm run typecheck` → must exit 0
+   - `npm test` → must exit 0
+   - `npm run e2e` → must exit 0 (if applicable)
+2. Review diff: `git diff main...HEAD` — no unintended changes
+3. Verify all acceptance criteria from parent Issue are met
+
+If ALL pass:
+
+- `git push origin feat/<issue-id>-<short-description>`
+- Create PR via GitHub CLI or MCP tool
+- Post PR link as comment on parent Issue
+- Update parent Issue status to `In Review`
+
+If ANY fail:
+
+- Identify failing item
+- Create or reopen a [DEBUG] child Issue
+- Re-run the fix cycle
+- If 3 consecutive failures, set parent Issue to `Blocked` with explanation
+
+---
+
+## Termination Conditions
+
+Terminate when ANY of the following is true:
+
+- All child Issues are Done and PR is created (or parent is set to In Review)
+- A blocking condition cannot be resolved (parent set to Blocked with explanation)
+- No actionable issues remain in Linear
+- Continuing further will not produce new results
+
+Prohibited:
+
+- Waiting for interaction
+- Waiting for additional instructions
+- Infinite loops
+- Waiting for confirmation to continue
 
 When completed or failed, output a brief final result and terminate with `exit 0` or `exit 1`.
