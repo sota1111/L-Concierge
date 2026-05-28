@@ -1,3 +1,11 @@
 .devcontainer/devcontainer-lock.json
 
 docs/ai/auto_logs/*
+
+# AI worker ephemeral artifacts
+docs/ai/50_worker_gemini_report.md
+docs/ai/60_worker_codex_report.md
+docs/ai/70_final_report.md
+prompts/gemini/implement.md
+prompts/codex/debug.md
+docs/ai/linear/
