@@ -20,7 +20,14 @@
       "Bash(sudo chown vscode:vscode /workspaces/ai-dev-test)",
       "Bash(git clone *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(bash -n /workspaces/ai-dev-control-plane/scripts/ai/scheduler.sh)",
+      "Bash(claude --version)",
+      "Bash(xxd *)",
+      "Bash(bash scripts/ai/run_auto.sh)",
+      "Bash(git rm *)",
+      "Read(//home/vscode/dev/2026/**)",
+      "Read(//home/vscode/dev/2026/ai-dev-test/**)"
     ]
   },
   "enabledMcpjsonServers": [
