@@ -160,18 +160,17 @@ if [[ "${1:-}" == "--watch" ]]; then
   fi
 
   echo "Scheduler running (PID: ${SCHED_PID}). Watching log."
-  echo "Ctrl+C to detach from log (scheduler keeps running)."
-  echo "To stop scheduler: bash scripts/ai/scheduler.sh stop"
+  echo "Ctrl+C to stop scheduler."
   echo ""
 
-  _detach_watch() {
+  _stop_watch() {
     echo ""
-    echo "Detached. Scheduler (PID: ${SCHED_PID}) is still running in background."
-    echo "To stop: bash scripts/ai/scheduler.sh stop"
-    kill "$TAIL_PID" 2>/dev/null || true
+    echo "Stopping scheduler (PID: ${SCHED_PID})..."
+    kill "$SCHED_PID" 2>/dev/null || true
+    kill "$TAIL_PID"  2>/dev/null || true
     exit 0
   }
-  trap _detach_watch INT TERM
+  trap _stop_watch INT TERM
 
   tail -f "$SCHEDULER_LOG" &
   TAIL_PID=$!
@@ -187,10 +186,15 @@ if [[ "${1:-}" == "--foreground" ]]; then
 
   _SLEEP_PID=""
   _RUN_PID=""
+  _MONITOR_PID=""
   _fg_cleanup() {
     kill "$_SLEEP_PID" 2>/dev/null || true
-    # 実行中の run_auto.sh プロセスグループごと終了させる
-    [[ -n "$_RUN_PID" ]] && kill -- -"$_RUN_PID" 2>/dev/null || true
+    kill "$_MONITOR_PID" 2>/dev/null || true
+    # 実行中の run_auto.sh がある場合は完了を待つ（途中で kill すると Execution error になるため）
+    if [[ -n "$_RUN_PID" ]]; then
+      log "Scheduler stopping — waiting for current run to complete (PID: ${_RUN_PID})..."
+      wait "$_RUN_PID" 2>/dev/null || true
+    fi
     rm -f "$PID_FILE"
     log "Scheduler stopped"
     exit 0
@@ -221,7 +225,17 @@ if [[ "${1:-}" == "--foreground" ]]; then
         log "--- Run start (Linear update triggered) ---"
         bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
         _RUN_PID=$!
+        # 30秒ごとに進捗ログを出力（watch でオペレーターが実行中かどうか確認できるように）
+        ( _p=$_RUN_PID; _e=0
+          while kill -0 "$_p" 2>/dev/null; do
+            sleep 30; ((_e+=30))
+            kill -0 "$_p" 2>/dev/null && log "... run in progress (${_e}s elapsed)"
+          done ) &
+        _MONITOR_PID=$!
         wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+        kill "$_MONITOR_PID" 2>/dev/null || true
+        wait "$_MONITOR_PID" 2>/dev/null || true
+        _MONITOR_PID=""
         _RUN_PID=""
         if [ "$_run_exit" -eq 0 ]; then
           log "--- Run completed successfully ---"
@@ -244,7 +258,16 @@ if [[ "${1:-}" == "--foreground" ]]; then
       log "--- Run start (fixed interval) ---"
       bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
       _RUN_PID=$!
+      ( _p=$_RUN_PID; _e=0
+        while kill -0 "$_p" 2>/dev/null; do
+          sleep 30; ((_e+=30))
+          kill -0 "$_p" 2>/dev/null && log "... run in progress (${_e}s elapsed)"
+        done ) &
+      _MONITOR_PID=$!
       wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+      kill "$_MONITOR_PID" 2>/dev/null || true
+      wait "$_MONITOR_PID" 2>/dev/null || true
+      _MONITOR_PID=""
       _RUN_PID=""
       if [ "$_run_exit" -eq 0 ]; then
         log "--- Run completed successfully ---"
