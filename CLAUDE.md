@@ -576,13 +576,16 @@ Quality Gate をすべて通過していれば、Claude Code が自律的に PR 
 
 ### Merge Procedure
 
+GitHub CLI を使って Merge する（PR Approve は不要）:
+
 ```bash
-git checkout main
-git pull origin main
-git merge --no-ff feat/<issue-id>-<short-description>
-git push origin main
-git branch -d feat/<issue-id>-<short-description>
-git push origin --delete feat/<issue-id>-<short-description>
+gh pr merge <PR番号> --merge --delete-branch
+```
+
+ローカルの main を最新化する:
+
+```bash
+git -C <repo-path> pull origin main
 ```
 
 Merge 後:
