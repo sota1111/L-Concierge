@@ -77,7 +77,7 @@ for line in sys.stdin:
                     else:
                         print(f"[{name}]", flush=True)
         elif t == "result" and ev.get("is_error"):
-            print(f"ERROR: {ev.get(\"result\", \"\")}", flush=True)
+            print("ERROR: " + ev.get("result", ""), flush=True)
     except Exception:
         if line:
             print(line, flush=True)
