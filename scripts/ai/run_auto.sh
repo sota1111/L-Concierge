@@ -49,8 +49,12 @@ echo "Start: ${TIMESTAMP}"
 echo "Log: ${LOG_FILE}"
 echo ""
 
+# current_debug.log: リアルタイム監視用シンボリックリンク
+ln -sf "run_${TIMESTAMP}_debug.log" "${LOG_DIR}/current_debug.log"
+
 claude \
   --dangerously-skip-permissions \
+  --debug-file "${LOG_DIR}/run_${TIMESTAMP}_debug.log" \
   -p "$(cat "$PROMPT_FILE")" \
   2>&1 | tee "$LOG_FILE"
 

@@ -225,12 +225,18 @@ if [[ "${1:-}" == "--foreground" ]]; then
         log "--- Run start (Linear update triggered) ---"
         bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
         _RUN_PID=$!
-        # 30秒ごとに進捗ログを出力（watch でオペレーターが実行中かどうか確認できるように）
-        ( _p=$_RUN_PID; _e=0
-          while kill -0 "$_p" 2>/dev/null; do
-            sleep 30; ((_e+=30))
-            kill -0 "$_p" 2>/dev/null && log "... run in progress (${_e}s elapsed)"
-          done ) &
+        # デバッグログからツール呼び出しをリアルタイム表示
+        (
+          _p=$_RUN_PID
+          sleep 1
+          tail -F "${LOG_DIR}/current_debug.log" 2>/dev/null | \
+          grep --line-buffered 'tool_dispatch_start' | \
+          stdbuf -oL sed 's/.*tool_dispatch_start tool=\([^ ]*\).*/\1/' | \
+          while IFS= read -r tool; do
+            kill -0 "$_p" 2>/dev/null || break
+            log "→ $tool"
+          done
+        ) &
         _MONITOR_PID=$!
         wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
         kill "$_MONITOR_PID" 2>/dev/null || true
@@ -258,11 +264,17 @@ if [[ "${1:-}" == "--foreground" ]]; then
       log "--- Run start (fixed interval) ---"
       bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
       _RUN_PID=$!
-      ( _p=$_RUN_PID; _e=0
-        while kill -0 "$_p" 2>/dev/null; do
-          sleep 30; ((_e+=30))
-          kill -0 "$_p" 2>/dev/null && log "... run in progress (${_e}s elapsed)"
-        done ) &
+      (
+        _p=$_RUN_PID
+        sleep 1
+        tail -F "${LOG_DIR}/current_debug.log" 2>/dev/null | \
+        grep --line-buffered 'tool_dispatch_start' | \
+        stdbuf -oL sed 's/.*tool_dispatch_start tool=\([^ ]*\).*/\1/' | \
+        while IFS= read -r tool; do
+          kill -0 "$_p" 2>/dev/null || break
+          log "→ $tool"
+        done
+      ) &
       _MONITOR_PID=$!
       wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
       kill "$_MONITOR_PID" 2>/dev/null || true
