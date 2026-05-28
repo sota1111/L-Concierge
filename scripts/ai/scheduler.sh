@@ -20,10 +20,18 @@ cd "$(dirname "$0")/../.."
 
 # プロジェクトルートの .env を自動読み込み（既存の環境変数は上書きしない）
 if [ -f ".env" ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source ".env"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      _key="${BASH_REMATCH[1]}"
+      _val="${BASH_REMATCH[2]}"
+      _val="${_val%\"}" ; _val="${_val#\"}"
+      _val="${_val%\'}" ; _val="${_val#\'}"
+      [[ -z "${!_key+x}" ]] && export "$_key=$_val"
+    fi
+  done < ".env"
+  unset _key _val
 fi
 
 INTERVAL=${INTERVAL:-3600}
@@ -195,7 +203,13 @@ if [[ "${1:-}" == "--foreground" ]]; then
 
   while true; do
     if [ -n "${LINEAR_API_KEY:-}" ]; then
-      # Linear ポーリングモード: 更新があれば実行
+      # Linear ポーリングモード: CHECK_INTERVAL 待機後にチェック・実行
+      # 初回はスケジューラー起動時点から、再実行時はタスク完了後からカウント開始
+      log "Next check in ${CHECK_INTERVAL}s"
+      sleep "$CHECK_INTERVAL" &
+      _SLEEP_PID=$!
+      wait "$_SLEEP_PID" 2>/dev/null || true
+
       update_status=0
       linear_has_updates || update_status=$?
 
@@ -206,28 +220,25 @@ if [[ "${1:-}" == "--foreground" ]]; then
         else
           log "--- Run failed (exit: $?) ---"
         fi
-        log "Next check in ${CHECK_INTERVAL}s"
       elif [ "$update_status" -eq 1 ]; then
-        log "No Linear updates detected, skipping run. Next check in ${CHECK_INTERVAL}s"
+        log "No Linear updates detected, skipping run."
       else
-        log "Linear API key not set (unexpected), skipping. Next check in ${CHECK_INTERVAL}s"
+        log "Linear API key not set (unexpected), skipping."
       fi
-
-      sleep "$CHECK_INTERVAL" &
+    else
+      # フォールバック: INTERVAL 待機後に実行
+      # 初回はスケジューラー起動時点から、再実行時はタスク完了後からカウント開始
+      log "Next run in ${INTERVAL}s"
+      sleep "$INTERVAL" &
       _SLEEP_PID=$!
       wait "$_SLEEP_PID" 2>/dev/null || true
-    else
-      # フォールバック: 固定間隔で実行
+
       log "--- Run start (fixed interval) ---"
       if bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1; then
         log "--- Run completed successfully ---"
       else
         log "--- Run failed (exit: $?) ---"
       fi
-      log "Next run in ${INTERVAL}s"
-      sleep "$INTERVAL" &
-      _SLEEP_PID=$!
-      wait "$_SLEEP_PID" 2>/dev/null || true
     fi
   done
   exit 0
