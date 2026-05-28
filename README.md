@@ -26,8 +26,6 @@ cp .env .env.local  # 任意。.env を直接編集してもよい
 |---|---|---|
 | `LINEAR_API_KEY` | Linear Personal API Token | Linear > Settings > API > Personal API keys |
 | `ANTHROPIC_API_KEY` | Anthropic API キー | console.anthropic.com/settings/keys |
-| `GEMINI_API_KEY` | Gemini API キー | aistudio.google.com/app/apikey |
-| `OPENAI_API_KEY` | OpenAI API キー（Codex用） | platform.openai.com/api-keys |
 
 ## 動作モード
 
