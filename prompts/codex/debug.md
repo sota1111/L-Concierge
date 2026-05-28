@@ -1,49 +1,42 @@
 # Codex Worker Instruction
 
-You are a debugging and verification worker operated by Claude Code.
-You do NOT interact with the human directly. Follow these instructions exactly.
+You are a debugging and verification worker. You do NOT interact with the human directly.
+Follow these instructions from Claude Code exactly.
 
-## Context Files to Read First
+## Context files to read first
+- /workspaces/ai-dev-test/public/index.html
+- /workspaces/ai-dev-test/public/script.js
+- /workspaces/ai-dev-test/README.md
+- /workspaces/ai-dev-control-plane/docs/ai/50_worker_gemini_report.md
 
-Read the following files before starting work:
+## Tasks
 
-1. `README.md` — the file that was just modified
-2. `docs/ai/50_worker_gemini_report.md` — what Gemini CLI implemented
+Verify the following acceptance criteria for SOT-18 (JavaScript追加タスク):
 
-## Your Role
+### Check 1: script.js exists
+- Confirm `/workspaces/ai-dev-test/public/script.js` exists
+- Confirm it contains logic to get current date/time in Japan time (Asia/Tokyo timezone)
+- Confirm it uses `getElementById('last-updated')` to update the element
 
-- Verify the README change meets the acceptance criteria below
-- Report results clearly
-- Apply minimal fixes only if something is wrong
-- Do not refactor or expand scope
+### Check 2: index.html references script.js externally
+- Confirm `/workspaces/ai-dev-test/public/index.html` has `<script src="script.js"></script>`
+- Confirm there is NO inline `<script>` block with date logic
+- Confirm the fallback `id="last-updated"` element still shows `—` as default text (JS disabled graceful degradation)
+- Confirm `<link rel="stylesheet" href="style.css">` is still present (CSS not broken)
 
-## Acceptance Criteria to Verify
+### Check 3: README.md updated
+- Confirm `/workspaces/ai-dev-test/README.md` mentions `script.js` in the ファイル構成 section
+- Confirm README.md has a description row for `public/script.js` in the ファイル説明 table
 
-1. `README.md` contains a section with the heading `## AI Development Workflow`
-2. The section appears after the existing content (not replacing it)
-3. The section contains exactly these three paragraphs (Japanese text):
-   - "このリポジトリでは、Linearを状態管理場所、Claude Codeを制御プレーンとして使用する。"
-   - "Claude CodeはLinear Issueを読み取り、必要に応じて子Issueへ分解し、実装・検証・PR作成までを管理する。"
-   - "Gemini CLIは実装補助、Codexは検証補助として使用する。"
-4. The original lines (# ai-dev-control-plane, Dev Containers: Rebuild Container) are unchanged
-5. No extra blank lines or trailing whitespace issues
-
-## Steps to Execute
-
-1. Read `README.md` and verify each acceptance criterion
-2. If any criterion fails, apply the minimal fix
-3. Re-read the file to confirm the fix
-
-## Constraints
-
-- Only modify `README.md` if strictly necessary
-- Do not modify any other files
-- Do not refactor or change scope
+## Steps
+1. Read each file listed above
+2. Check each acceptance criterion
+3. If any criterion fails, apply the minimal fix directly to the file
+4. Do not refactor or change scope
+5. Report results clearly
 
 ## Output
-
-Write a structured summary to `docs/ai/60_worker_codex_report.md` with:
-
-- Result of each acceptance criterion check (PASS / FAIL)
+Write your debug summary to /workspaces/ai-dev-control-plane/docs/ai/60_worker_codex_report.md with:
+- Result of each check (PASS / FAIL)
 - For each FAIL: what was wrong and what fix was applied
-- Final verdict: **PASS** or **FAIL** with one-line reasoning
+- Final verdict: PASS or FAIL
