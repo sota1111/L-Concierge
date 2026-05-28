@@ -160,17 +160,18 @@ if [[ "${1:-}" == "--watch" ]]; then
   fi
 
   echo "Scheduler running (PID: ${SCHED_PID}). Watching log."
-  echo "Ctrl+C to stop scheduler."
+  echo "Ctrl+C to detach from log (scheduler keeps running)."
+  echo "To stop scheduler: bash scripts/ai/scheduler.sh stop"
   echo ""
 
-  _stop_watch() {
+  _detach_watch() {
     echo ""
-    echo "Stopping scheduler (PID: ${SCHED_PID})..."
-    kill "$SCHED_PID" 2>/dev/null || true
-    kill "$TAIL_PID"  2>/dev/null || true
+    echo "Detached. Scheduler (PID: ${SCHED_PID}) is still running in background."
+    echo "To stop: bash scripts/ai/scheduler.sh stop"
+    kill "$TAIL_PID" 2>/dev/null || true
     exit 0
   }
-  trap _stop_watch INT TERM
+  trap _detach_watch INT TERM
 
   tail -f "$SCHEDULER_LOG" &
   TAIL_PID=$!
