@@ -1,5 +1,9 @@
 .devcontainer/devcontainer-lock.json
 
+# 環境変数（シークレットを含むため追跡しない）
+.env
+.env.local
+
 docs/ai/auto_logs/*
 
 # AI worker ephemeral artifacts
