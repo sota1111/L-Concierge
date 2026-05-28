@@ -8,7 +8,22 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.docker.com)",
       "WebFetch(domain:code.visualstudio.com)",
-      "mcp__linear-server__list_projects"
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:linear.app)",
+      "WebFetch(domain:mcp.linear.app)",
+      "WebFetch(domain:containers.dev)",
+      "WebFetch(domain:registry.hub.docker.com)",
+      "WebFetch(domain:hub.docker.com)",
+      "mcp__linear-server__list_projects",
+      "Bash(sudo mkdir /workspaces/ai-dev-test)",
+      "Bash(sudo chown vscode:vscode /workspaces/ai-dev-test)",
+      "Bash(git clone *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "linear-server"
+  ]
 }

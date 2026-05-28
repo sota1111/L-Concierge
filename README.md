@@ -1,4 +1,4 @@
-# L-Concierge
+# ai-dev-control-plane
 
 Dev Containers: Rebuild Container
 
@@ -9,3 +9,82 @@ Dev Containers: Rebuild Container
 Claude CodeはLinear Issueを読み取り、必要に応じて子Issueへ分解し、実装・検証・PR作成までを管理する。
 
 Gemini CLIは実装補助、Codexは検証補助として使用する。
+
+# スケジューラー
+
+`scripts/ai/scheduler.sh` は Linear の更新を監視し、変化があれば自動で Claude を起動する。
+
+## 事前準備：`.env` の設定
+
+```bash
+cp .env .env.local  # 任意。.env を直接編集してもよい
+```
+
+`.env` を開き、最低限以下を記入する：
+
+| 変数 | 説明 | 取得先 |
+|---|---|---|
+| `LINEAR_API_KEY` | Linear Personal API Token | Linear > Settings > API > Personal API keys |
+| `ANTHROPIC_API_KEY` | Anthropic API キー | console.anthropic.com/settings/keys |
+
+## 動作モード
+
+### Linear ポーリングモード（推奨）
+
+`LINEAR_API_KEY` が設定されている場合、`CHECK_INTERVAL` 秒ごとに Linear を確認し、  
+Todo / Backlog / In Progress の Issue が更新されたときだけ Claude を実行する。
+
+### フォールバックモード
+
+`LINEAR_API_KEY` が未設定の場合、`INTERVAL` 秒ごとに無条件で Claude を実行する。
+
+## コマンド
+
+### 起動（ログをリアルタイム表示）
+
+```bash
+bash scripts/ai/scheduler.sh --watch
+```
+
+### バックグラウンドで起動
+
+```bash
+bash scripts/ai/scheduler.sh
+```
+
+### 状態確認
+
+```bash
+bash scripts/ai/scheduler.sh status
+```
+
+出力例：
+```
+Scheduler is running (PID: 12345)
+Log: docs/ai/auto_logs/scheduler.log
+Last Linear updatedAt: 2026-05-28T01:19:09.175Z
+Mode: Linear polling (CHECK_INTERVAL=60s)
+```
+
+### 停止
+
+```bash
+bash scripts/ai/scheduler.sh stop
+```
+
+## 環境変数リファレンス
+
+| 変数 | デフォルト | 説明 |
+|---|---|---|
+| `LINEAR_API_KEY` | なし | Linear Personal API Token。設定するとポーリングモードが有効になる |
+| `CHECK_INTERVAL` | `60` | Linear ポーリング間隔（秒） |
+| `INTERVAL` | `3600` | フォールバック実行間隔（秒） |
+
+## ログ
+
+実行ログは `docs/ai/auto_logs/` に保存される。
+
+```
+docs/ai/auto_logs/scheduler.log   # スケジューラー動作ログ
+docs/ai/auto_logs/run_*.log       # 各 Claude 実行ログ（タイムスタンプ付き）
+```

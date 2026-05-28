@@ -1,3 +1,19 @@
 .devcontainer/devcontainer-lock.json
 
+# 環境変数（シークレットを含むため追跡しない）
+.env
+.env.local
+
 docs/ai/auto_logs/*
+
+# AI worker ephemeral artifacts
+docs/ai/10_plan.md
+docs/ai/20_design.md
+docs/ai/30_tasks.md
+docs/ai/40_acceptance.md
+docs/ai/50_worker_gemini_report.md
+docs/ai/60_worker_codex_report.md
+docs/ai/70_final_report.md
+prompts/gemini/implement.md
+prompts/codex/debug.md
+docs/ai/linear/
