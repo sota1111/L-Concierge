@@ -186,10 +186,8 @@ if [[ "${1:-}" == "--foreground" ]]; then
 
   _SLEEP_PID=""
   _RUN_PID=""
-  _MONITOR_PID=""
   _fg_cleanup() {
     kill "$_SLEEP_PID" 2>/dev/null || true
-    kill "$_MONITOR_PID" 2>/dev/null || true
     # 実行中の run_auto.sh がある場合は完了を待つ（途中で kill すると Execution error になるため）
     if [[ -n "$_RUN_PID" ]]; then
       log "Scheduler stopping — waiting for current run to complete (PID: ${_RUN_PID})..."
@@ -225,23 +223,7 @@ if [[ "${1:-}" == "--foreground" ]]; then
         log "--- Run start (Linear update triggered) ---"
         bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
         _RUN_PID=$!
-        # デバッグログからツール呼び出しをリアルタイム表示
-        (
-          _p=$_RUN_PID
-          sleep 1
-          tail -F "${LOG_DIR}/current_debug.log" 2>/dev/null | \
-          grep --line-buffered 'tool_dispatch_start' | \
-          stdbuf -oL sed 's/.*tool_dispatch_start tool=\([^ ]*\).*/\1/' | \
-          while IFS= read -r tool; do
-            kill -0 "$_p" 2>/dev/null || break
-            log "→ $tool"
-          done
-        ) &
-        _MONITOR_PID=$!
         wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
-        kill "$_MONITOR_PID" 2>/dev/null || true
-        wait "$_MONITOR_PID" 2>/dev/null || true
-        _MONITOR_PID=""
         _RUN_PID=""
         if [ "$_run_exit" -eq 0 ]; then
           log "--- Run completed successfully ---"
@@ -264,22 +246,7 @@ if [[ "${1:-}" == "--foreground" ]]; then
       log "--- Run start (fixed interval) ---"
       bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
       _RUN_PID=$!
-      (
-        _p=$_RUN_PID
-        sleep 1
-        tail -F "${LOG_DIR}/current_debug.log" 2>/dev/null | \
-        grep --line-buffered 'tool_dispatch_start' | \
-        stdbuf -oL sed 's/.*tool_dispatch_start tool=\([^ ]*\).*/\1/' | \
-        while IFS= read -r tool; do
-          kill -0 "$_p" 2>/dev/null || break
-          log "→ $tool"
-        done
-      ) &
-      _MONITOR_PID=$!
       wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
-      kill "$_MONITOR_PID" 2>/dev/null || true
-      wait "$_MONITOR_PID" 2>/dev/null || true
-      _MONITOR_PID=""
       _RUN_PID=""
       if [ "$_run_exit" -eq 0 ]; then
         log "--- Run completed successfully ---"

@@ -49,14 +49,46 @@ echo "Start: ${TIMESTAMP}"
 echo "Log: ${LOG_FILE}"
 echo ""
 
-# current_debug.log: リアルタイム監視用シンボリックリンク
-ln -sf "run_${TIMESTAMP}_debug.log" "${LOG_DIR}/current_debug.log"
+# stream-json イベントから assistant のテキストとツール呼び出しをリアルタイム抽出
+_STREAM_FILTER='
+import sys, json
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        ev = json.loads(line)
+        t = ev.get("type", "")
+        if t == "assistant":
+            for blk in ev.get("message", {}).get("content", []):
+                bt = blk.get("type", "")
+                if bt == "text":
+                    txt = blk.get("text", "")
+                    if txt.strip():
+                        print(txt, end="" if txt.endswith("\n") else "\n", flush=True)
+                elif bt == "tool_use":
+                    name = blk.get("name", "?")
+                    inp = blk.get("input", {})
+                    d = (inp.get("command") or inp.get("file_path") or
+                         inp.get("path") or inp.get("query") or
+                         inp.get("pattern") or "")
+                    if d:
+                        print(f"[{name}] {str(d)[:120]}", flush=True)
+                    else:
+                        print(f"[{name}]", flush=True)
+        elif t == "result" and ev.get("is_error"):
+            print(f"ERROR: {ev.get(\"result\", \"\")}", flush=True)
+    except Exception:
+        if line:
+            print(line, flush=True)
+'
 
 claude \
   --dangerously-skip-permissions \
-  --debug-file "${LOG_DIR}/run_${TIMESTAMP}_debug.log" \
+  --output-format stream-json \
+  --verbose \
   -p "$(cat "$PROMPT_FILE")" \
-  2>&1 | tee "$LOG_FILE"
+  2>&1 | python3 -u -c "$_STREAM_FILTER" | tee "$LOG_FILE"
 
 EXIT_CODE=${PIPESTATUS[0]}
 
