@@ -185,8 +185,11 @@ if [[ "${1:-}" == "--foreground" ]]; then
   echo $$ > "$PID_FILE"
 
   _SLEEP_PID=""
+  _RUN_PID=""
   _fg_cleanup() {
     kill "$_SLEEP_PID" 2>/dev/null || true
+    # 実行中の run_auto.sh プロセスグループごと終了させる
+    [[ -n "$_RUN_PID" ]] && kill -- -"$_RUN_PID" 2>/dev/null || true
     rm -f "$PID_FILE"
     log "Scheduler stopped"
     exit 0
@@ -215,10 +218,14 @@ if [[ "${1:-}" == "--foreground" ]]; then
 
       if [ "$update_status" -eq 0 ]; then
         log "--- Run start (Linear update triggered) ---"
-        if bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1; then
+        bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
+        _RUN_PID=$!
+        wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+        _RUN_PID=""
+        if [ "$_run_exit" -eq 0 ]; then
           log "--- Run completed successfully ---"
         else
-          log "--- Run failed (exit: $?) ---"
+          log "--- Run failed (exit: ${_run_exit}) ---"
         fi
       elif [ "$update_status" -eq 1 ]; then
         log "No Linear updates detected, skipping run."
@@ -234,10 +241,14 @@ if [[ "${1:-}" == "--foreground" ]]; then
       wait "$_SLEEP_PID" 2>/dev/null || true
 
       log "--- Run start (fixed interval) ---"
-      if bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1; then
+      bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
+      _RUN_PID=$!
+      wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+      _RUN_PID=""
+      if [ "$_run_exit" -eq 0 ]; then
         log "--- Run completed successfully ---"
       else
-        log "--- Run failed (exit: $?) ---"
+        log "--- Run failed (exit: ${_run_exit}) ---"
       fi
     fi
   done
