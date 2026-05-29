@@ -90,6 +90,35 @@ linear_has_updates() {
   return 1  # no change
 }
 
+# セッションリミットのリセット時刻を解析し、リセット+10分後の epoch 秒を返す
+# 引数: run_auto.sh の出力テキスト
+# 例: "You've hit your session limit · resets 3:30pm (UTC)"
+_parse_session_reset_epoch() {
+  local output="$1"
+  local reset_str
+  reset_str=$(echo "$output" | grep -oP '(?<=resets )[0-9]+:[0-9]+(am|pm)?(?= \(UTC\))' | head -1) || true
+  [ -z "$reset_str" ] && return 1
+
+  local hour min ampm=''
+  if [[ "$reset_str" =~ ^([0-9]+):([0-9]+)(am|pm)$ ]]; then
+    hour="${BASH_REMATCH[1]}"; min="${BASH_REMATCH[2]}"; ampm="${BASH_REMATCH[3]}"
+  elif [[ "$reset_str" =~ ^([0-9]+):([0-9]+)$ ]]; then
+    hour="${BASH_REMATCH[1]}"; min="${BASH_REMATCH[2]}"
+  else
+    return 1
+  fi
+
+  if [[ "$ampm" == "pm" ]] && [[ "$hour" -ne 12 ]]; then hour=$((hour + 12)); fi
+  if [[ "$ampm" == "am" ]] && [[ "$hour" -eq 12 ]]; then hour=0; fi
+
+  local reset_epoch
+  reset_epoch=$(date -u -d "today $(printf '%02d:%02d:00' "$hour" "$min") UTC" +%s 2>/dev/null) || return 1
+  local target=$((reset_epoch + 600))   # +10 分
+  local now_epoch; now_epoch=$(date -u +%s)
+  if [[ "$target" -le "$now_epoch" ]]; then target=$((target + 86400)); fi
+  echo "$target"
+}
+
 # --- stop ---
 if [[ "${1:-}" == "stop" ]]; then
   if [ -f "$PID_FILE" ]; then
@@ -221,15 +250,46 @@ if [[ "${1:-}" == "--foreground" ]]; then
 
       if [ "$update_status" -eq 0 ]; then
         log "--- Run start (Linear update triggered) ---"
-        bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
+        _tmp_log=$(mktemp)
+        bash scripts/ai/run_auto.sh > "$_tmp_log" 2>&1 &
         _RUN_PID=$!
         wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
         _RUN_PID=""
+        cat "$_tmp_log" >> "$SCHEDULER_LOG"
         if [ "$_run_exit" -eq 0 ]; then
           log "--- Run completed successfully ---"
         else
           log "--- Run failed (exit: ${_run_exit}) ---"
+          _session_wait=$(_parse_session_reset_epoch "$(cat "$_tmp_log")") || _session_wait=""
+          if [ -n "$_session_wait" ]; then
+            _reset_disp=$(date -u -d "@$((_session_wait - 600))" '+%H:%M UTC')
+            _wait_min=$(( (_session_wait - $(date -u +%s) + 59) / 60 ))
+            log "Session limit detected (reset: ${_reset_disp}). Waiting until 10 min after reset (~${_wait_min} min)..."
+            while true; do
+              _now_e=$(date -u +%s)
+              _rem=$((_session_wait - _now_e))
+              if [ "$_rem" -le 0 ]; then break; fi
+              _chunk=$(( _rem < 30 ? _rem : 30 ))
+              sleep "$_chunk" &
+              _SLEEP_PID=$!
+              wait "$_SLEEP_PID" 2>/dev/null || true
+            done
+            log "--- Run start (session limit reset, forced) ---"
+            _tmp_log2=$(mktemp)
+            bash scripts/ai/run_auto.sh > "$_tmp_log2" 2>&1 &
+            _RUN_PID=$!
+            wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+            _RUN_PID=""
+            cat "$_tmp_log2" >> "$SCHEDULER_LOG"
+            rm -f "$_tmp_log2"
+            if [ "$_run_exit" -eq 0 ]; then
+              log "--- Run completed successfully ---"
+            else
+              log "--- Run failed (exit: ${_run_exit}) ---"
+            fi
+          fi
         fi
+        rm -f "$_tmp_log"
       elif [ "$update_status" -eq 1 ]; then
         log "No Linear updates detected, skipping run."
       else
@@ -244,15 +304,46 @@ if [[ "${1:-}" == "--foreground" ]]; then
       wait "$_SLEEP_PID" 2>/dev/null || true
 
       log "--- Run start (fixed interval) ---"
-      bash scripts/ai/run_auto.sh >> "$SCHEDULER_LOG" 2>&1 &
+      _tmp_log=$(mktemp)
+      bash scripts/ai/run_auto.sh > "$_tmp_log" 2>&1 &
       _RUN_PID=$!
       wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
       _RUN_PID=""
+      cat "$_tmp_log" >> "$SCHEDULER_LOG"
       if [ "$_run_exit" -eq 0 ]; then
         log "--- Run completed successfully ---"
       else
         log "--- Run failed (exit: ${_run_exit}) ---"
+        _session_wait=$(_parse_session_reset_epoch "$(cat "$_tmp_log")") || _session_wait=""
+        if [ -n "$_session_wait" ]; then
+          _reset_disp=$(date -u -d "@$((_session_wait - 600))" '+%H:%M UTC')
+          _wait_min=$(( (_session_wait - $(date -u +%s) + 59) / 60 ))
+          log "Session limit detected (reset: ${_reset_disp}). Waiting until 10 min after reset (~${_wait_min} min)..."
+          while true; do
+            _now_e=$(date -u +%s)
+            _rem=$((_session_wait - _now_e))
+            if [ "$_rem" -le 0 ]; then break; fi
+            _chunk=$(( _rem < 30 ? _rem : 30 ))
+            sleep "$_chunk" &
+            _SLEEP_PID=$!
+            wait "$_SLEEP_PID" 2>/dev/null || true
+          done
+          log "--- Run start (session limit reset, forced) ---"
+          _tmp_log2=$(mktemp)
+          bash scripts/ai/run_auto.sh > "$_tmp_log2" 2>&1 &
+          _RUN_PID=$!
+          wait "$_RUN_PID" && _run_exit=0 || _run_exit=$?
+          _RUN_PID=""
+          cat "$_tmp_log2" >> "$SCHEDULER_LOG"
+          rm -f "$_tmp_log2"
+          if [ "$_run_exit" -eq 0 ]; then
+            log "--- Run completed successfully ---"
+          else
+            log "--- Run failed (exit: ${_run_exit}) ---"
+          fi
+        fi
       fi
+      rm -f "$_tmp_log"
     fi
   done
   exit 0
